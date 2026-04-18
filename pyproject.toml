@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "obsidian-mcp"
+version = "0.1.0"
+description = "MCP server for Obsidian notes via Local REST API"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp",
+    "httpx",
+    "pydantic",
+]
+
+[project.scripts]
+obsidian-mcp = "obsidian_mcp.server:main"
