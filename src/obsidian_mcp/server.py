@@ -1,3 +1,4 @@
+from pathlib import PurePosixPath
 from fastmcp import FastMCP
 from pydantic import Field
 
@@ -81,6 +82,152 @@ async def update_note(
         result = await client.append_note(path, content)
         return f"Appended to note: {result['path']}"
 
+
+@mcp.tool()
+async def list_tags() -> str:
+    """List all tags in the Obsidian vault with their usage counts.
+
+    Useful for discovering what tags exist before searching by tag.
+    """
+    tags = await client.list_tags()
+    if not tags:
+        return "No tags found."
+    lines = [f"- **{t.get('tag', '?')}** ({t.get('count', 0)} uses)" for t in tags]
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def list_commands() -> str:
+    """List all available Obsidian commands (built-in and plugin-provided).
+
+    Call this before execute_command to discover available command IDs.
+    """
+    commands = await client.list_commands()
+    if not commands:
+        return "No commands found."
+    lines = [f"- `{c.get('id', '?')}` — {c.get('name', 'unnamed')}" for c in commands]
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def execute_command(command_id: str) -> str:
+    """Execute an Obsidian command by its ID.
+
+    Use list_commands first to discover available commands and their IDs.
+    Be cautious with destructive commands.
+
+    Args:
+        command_id: The command ID to execute (e.g. "editor:toggle-checklist-status").
+    """
+    result = await client.execute_command(command_id)
+    return f"Executed command: {result['command_id']}"
+
+
+@mcp.tool()
+async def open_note(path: str) -> str:
+    """Open a note in the Obsidian UI so the user can see it.
+
+    Args:
+        path: Path to the note relative to vault root (e.g. "folder/note.md").
+    """
+    result = await client.open_note(path)
+    return f"Opened note in Obsidian: {result['path']}"
+
+
+@mcp.tool()
+async def list_notes(folder: str = "") -> str:
+    """List notes in a folder or the entire vault.
+
+    Complements search_notes — search finds notes by content, this finds notes by location.
+
+    Args:
+        folder: Folder path relative to vault root (e.g. "Projects"). Empty string for entire vault.
+    """
+    notes = await client.list_notes(folder)
+    if not notes:
+        return "No notes found."
+    if isinstance(notes, dict) and "files" in notes:
+        files = notes["files"]
+    elif isinstance(notes, list):
+        files = notes
+    else:
+        return str(notes)
+    lines = [f"- {f}" for f in files]
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def get_daily_note(date: str | None = None) -> str:
+    """Read today's daily note or a daily note for a specific date.
+
+    Avoids needing to guess daily note naming conventions or folder structure.
+
+    Args:
+        date: Optional date in YYYY-MM-DD format. If not provided, returns today's daily note.
+    """
+    if date:
+        parts = date.split("-")
+        year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+        return await client.get_daily_note(year, month, day)
+    return await client.get_daily_note()
+
+
+@mcp.tool()
+async def find_backlinks(path: str) -> str:
+    """Find all notes that link to the given note using [[wiki-link]] syntax.
+
+    Surfaces relationship context by finding notes that explicitly reference
+    the target note through Obsidian's linking system.
+
+    Args:
+        path: Path to the note relative to vault root (e.g. "folder/note.md").
+    """
+    note_name = PurePosixPath(path).stem
+    results = await client.search_notes(f"[[{note_name}]]")
+    if not results:
+        return f"No backlinks found for '{note_name}'."
+    lines = [f"- **{item.get('filename', 'unknown')}**" for item in results]
+    return f"Notes linking to '{note_name}':\n" + "\n".join(lines)
+
+
+@mcp.tool()
+async def get_recent_notes(days: int = 7) -> str:
+    """Get notes modified within a given time window.
+
+    Uses file listing metadata to find recently modified notes.
+
+    Args:
+        days: Number of days to look back (default: 7).
+    """
+    import time
+
+    notes = await client.list_notes()
+    if isinstance(notes, dict) and "files" in notes:
+        files = notes["files"]
+    elif isinstance(notes, list):
+        files = notes
+    else:
+        return str(notes)
+
+    cutoff = time.time() - (days * 86400)
+    recent = []
+    for f in files:
+        if isinstance(f, dict):
+            mtime = f.get("mtime", 0) or f.get("modified", 0)
+            if mtime >= cutoff:
+                recent.append(f)
+        else:
+            recent.append(f)
+
+    if not recent:
+        return f"No notes modified in the last {days} days."
+
+    recent.sort(key=lambda x: x.get("mtime", 0) if isinstance(x, dict) else 0, reverse=True)
+    lines = []
+    for f in recent:
+        name = f.get("path", f) if isinstance(f, dict) else f
+        lines.append(f"- {name}")
+    return "\n".join(lines)
 
 
 @mcp.prompt(

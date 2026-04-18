@@ -83,7 +83,7 @@ Replace `/path/to/obsidian-mcp-server` with the absolute path to your cloned rep
 
 ## Tools
 
-The server exposes four tools that AI agents can call:
+The server exposes eleven tools that AI agents can call:
 
 ### `create_note`
 
@@ -128,6 +128,66 @@ Updates an existing note. When called without targeting parameters, it appends c
 - **Append to a note:** Call with just `path` and `content` — content is added to the end.
 - **Replace a heading section:** Set `target_type="heading"`, `target="My Heading"`, `operation="replace"`.
 - **Prepend to a block:** Set `target_type="block"`, `target="block-id"`, `operation="prepend"`.
+
+### `list_tags`
+
+Returns all tags in the vault with their usage counts. Useful for discovering what tags exist before searching by tag.
+
+*No parameters.*
+
+### `list_commands`
+
+Returns all available Obsidian commands (built-in and plugin-provided) with their IDs. Call this before `execute_command` to discover available commands.
+
+*No parameters.*
+
+### `execute_command`
+
+Executes an Obsidian command by its ID. Use `list_commands` first to discover available commands.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `command_id` | `str` | The command ID to execute (e.g. `"editor:toggle-checklist-status"`) |
+
+### `open_note`
+
+Opens a note in the Obsidian UI so the user can see it directly.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `path` | `str` | Path to the note relative to vault root (e.g. `"folder/note.md"`) |
+
+### `list_notes`
+
+Lists notes in a folder or the entire vault. Complements `search_notes` — search finds notes by content, this finds notes by location.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `folder` | `str` *(optional)* | Folder path relative to vault root (e.g. `"Projects"`). Empty for entire vault |
+
+### `get_daily_note`
+
+Reads today's daily note or a daily note for a specific date. Avoids needing to guess daily note naming conventions or folder structure.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `date` | `str` *(optional)* | Date in `YYYY-MM-DD` format. If not provided, returns today's daily note |
+
+### `find_backlinks`
+
+Finds all notes that link to the given note using `[[wiki-link]]` syntax. Surfaces relationship context by finding notes that explicitly reference the target note through Obsidian's linking system.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `path` | `str` | Path to the note relative to vault root (e.g. `"folder/note.md"`) |
+
+### `get_recent_notes`
+
+Returns notes modified within a given time window, sorted by most recent first. Uses file listing metadata to find recently modified notes.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `days` | `int` *(optional)* | Number of days to look back (default: `7`) |
 
 ## Prompts
 
